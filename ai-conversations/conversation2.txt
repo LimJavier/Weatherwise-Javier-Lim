@@ -1,0 +1,335 @@
+Tool: ChatGPT
+Date: 10-10-2025
+Title: Conversations about temperature visualisation
+------------------------------------------------------------------------------------------------------------------
+Me: Can you help me write the function create_temperature_visualisation using matplotlib? The function should visualise temperature data from the processed weather data returned by my get_weather_data() function.
+AI: Got it 👍 — let’s create a clean, well-structured Python function called create_temperature_visualisation() that uses Matplotlib to plot temperature trends from your processed weather data (the dictionary returned by your get_weather_data() function).
+
+This function will:
+
+Plot minimum and maximum temperatures across forecast days.
+
+Include labels, title, grid, and legends.
+
+Handle cases when no forecast data exists.
+✅ Example Implementation
+import matplotlib.pyplot as plt
+
+def create_temperature_visualisation(weather_data, output_type='display'):
+    """
+    Create a temperature visualisation using matplotlib based on processed weather data.
+
+    Args:
+        weather_data (dict): Processed weather data returned by get_weather_data(), expected to include:
+            - location (str): City name
+            - forecast (list of dict): Each dict should have:
+                * 'date' (str): Forecast date (YYYY-MM-DD)
+                * 'temperature_min' (float): Minimum temperature
+                * 'temperature_max' (float): Maximum temperature
+        output_type (str): 'display' to show the plot or 'save' to save it as an image file.
+        
+    Returns:
+        None. Displays or saves a temperature trend plot.
+    """
+
+    # Check for forecast data
+    if not weather_data.get("forecast"):
+        print("No forecast data available to visualise.")
+        return
+
+    # Extract data for plotting
+    dates = [entry["date"] for entry in weather_data["forecast"]]
+    temp_min = [entry["temperature_min"] for entry in weather_data["forecast"]]
+    temp_max = [entry["temperature_max"] for entry in weather_data["forecast"]]
+
+    # Create figure and axis
+    plt.figure(figsize=(10, 6))
+    plt.plot(dates, temp_max, label="Max Temperature (°C)", color="tomato", marker="o")
+    plt.plot(dates, temp_min, label="Min Temperature (°C)", color="dodgerblue", marker="o")
+    plt.fill_between(dates, temp_min, temp_max, color="lightgray", alpha=0.3)
+
+    # Chart labels and styling
+    plt.title(f"Temperature Forecast for {weather_data.get('location', 'Unknown Location')}")
+    plt.xlabel("Date")
+    plt.ylabel("Temperature (°C)")
+    plt.xticks(rotation=30)
+    plt.grid(alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+
+    # Display or save plot
+    if output_type == 'display':
+        plt.show()
+    elif output_type == 'save':
+        file_name = f"temperature_forecast_{weather_data.get('location', 'unknown').replace(',', '').replace(' ', '_')}.png"
+        plt.savefig(file_name)
+        print(f"Temperature visualisation saved as '{file_name}'")
+    else:
+        print("Invalid output_type. Use 'display' or 'save'.")
+
+🧠 Example Usage
+# Example processed weather data
+weather_data = {
+    "location": "Perth, AU",
+    "forecast": [
+        {"date": "2025-10-11", "temperature_min": 19, "temperature_max": 29},
+        {"date": "2025-10-12", "temperature_min": 18, "temperature_max": 27},
+        {"date": "2025-10-13", "temperature_min": 20, "temperature_max": 30},
+    ]
+}
+
+# Display the temperature chart
+create_temperature_visualisation(weather_data)
+
+🎯 Features
+
+✅ Automatically detects if forecast data is missing
+
+✅ Shows clear temperature range (min–max)
+
+✅ Option to display or save the figure
+
+✅ Customizable output title based on location
+
+Me: Thanks for the code. Could you improve this function by: 1. Rewrite the docstring to make it clear and concise, with explanation about the purpose, inputs, and outputs 2. Ensure the function can either display the chart directly or return the figure object, depending on an argument 3. Improve the readability of all visualisations with proper titles, axis labels, and a legend 4. Improve error handling for missing or extreme data values, such as incomplete forecast
+AI: Perfect 😄 — I’ll enhance your create_temperature_visualisation() function so it meets your four requirements:
+
+Clear, concise docstring explaining purpose, inputs, and outputs
+
+2. Option to display chart or return figure object
+
+3. Better readability with titles, axis labels, and legends
+
+4. Error handling for missing or incomplete forecast data
+
+Here’s the improved version:
+
+import matplotlib.pyplot as plt
+
+def create_temperature_visualisation(weather_data, output_mode='display'):
+    """
+    Create a temperature trend visualisation from processed weather forecast data.
+
+    Purpose:
+        To plot the minimum and maximum temperature trends for a location over forecast days,
+        enhancing data readability for analysis or reporting.
+
+    Args:
+        weather_data (dict): Processed weather data containing:
+            - location (str): Location name (e.g., "Perth, AU").
+            - forecast (list of dict): Forecast list with each entry containing:
+                * 'date' (str): Date in YYYY-MM-DD format.
+                * 'temperature_min' (float): Minimum temperature for the day.
+                * 'temperature_max' (float): Maximum temperature for the day.
+        output_mode (str): Determines output behaviour:
+            - 'display': Display the chart directly.
+            - 'return': Return the Matplotlib figure object for further use.
+
+    Returns:
+        matplotlib.figure.Figure or None:
+            - Returns the figure object if output_mode='return'.
+            - Returns None if output_mode='display'.
+    Raises:
+        ValueError: If forecast data is missing or incomplete.
+        TypeError: If input data format is incorrect.
+    """
+
+    # Validate forecast data
+    if not weather_data or "forecast" not in weather_data:
+        raise ValueError("Missing weather forecast data.")
+
+    forecast = weather_data["forecast"]
+    if not isinstance(forecast, list) or len(forecast) == 0:
+        raise ValueError("Forecast data must be a non-empty list.")
+
+    # Extract dates and temperatures with error handling
+    dates = []
+    temp_min = []
+    temp_max = []
+    for entry in forecast:
+        try:
+            dates.append(entry["date"])
+            temp_min.append(float(entry["temperature_min"]))
+            temp_max.append(float(entry["temperature_max"]))
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("Forecast entries must contain valid 'date', 'temperature_min', and 'temperature_max'.")
+
+    # Check for extreme or missing values
+    if any(t is None for t in temp_min + temp_max):
+        raise ValueError("Temperature data contains None values.")
+    if any(abs(t) > 100 for t in temp_min + temp_max):  # Extreme check
+        raise ValueError("Temperature data contains unrealistic values.")
+
+    # Create figure and plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(dates, temp_max, label="Max Temperature (°C)", color="tomato", marker="o")
+    ax.plot(dates, temp_min, label="Min Temperature (°C)", color="dodgerblue", marker="o")
+    ax.fill_between(dates, temp_min, temp_max, color="lightgray", alpha=0.3)
+
+    # Improve readability
+    ax.set_title(f"Temperature Forecast for {weather_data.get('location', 'Unknown Location')}", fontsize=16, weight='bold')
+    ax.set_xlabel("Date", fontsize=12)
+    ax.set_ylabel("Temperature (°C)", fontsize=12)
+    ax.tick_params(axis='x', rotation=30)
+    ax.grid(alpha=0.3)
+    ax.legend(title="Legend", fontsize=10)
+
+    plt.tight_layout()
+
+    # Display or return figure
+    if output_mode == 'display':
+        plt.show()
+        return None
+    elif output_mode == 'return':
+        return fig
+    else:
+        raise ValueError("Invalid output_mode. Use 'display' or 'return'.")
+
+Me: Perfect. I want to create another visualisation for precipitation data. I need this function to plot precipitation trends from the processed weather data so that it is easy to interpret. My inputs will be a weather data dictionary returned by get_weather_data() function, and an output_type argument to display the plot or return the figure object.
+
+AI: Perfect 😄 — let’s make a matching function called create_precipitation_visualisation() so your temperature and precipitation visualisations have a consistent style.
+
+We’ll follow the same design principles as the improved temperature function:
+
+Clear docstring
+Error handling for missing/incomplete data
+Option to display chart or return the figure object
+Readable visuals with title, axis labels, and legend
+
+import matplotlib.pyplot as plt
+
+def create_precipitation_visualisation(weather_data, output_type='display'):
+    """
+    Create a precipitation trend visualisation from processed weather forecast data.
+
+    Purpose:
+        To plot daily precipitation trends for a location over forecast days,
+        making precipitation patterns easy to interpret.
+
+    Args:
+        weather_data (dict): Processed weather data containing:
+            - location (str): Location name (e.g., "Perth, AU").
+            - forecast (list of dict): Forecast list with each entry containing:
+                * 'date' (str): Date in YYYY-MM-DD format.
+                * 'precipitation' (float): Precipitation in millimeters for the day.
+        output_type (str): Determines output behaviour:
+            - 'display': Display the chart directly.
+            - 'return': Return the Matplotlib figure object for further use.
+
+    Returns:
+        matplotlib.figure.Figure or None:
+            - Returns the figure object if output_type='return'.
+            - Returns None if output_type='display'.
+
+    Raises:
+        ValueError: If forecast data is missing or incomplete.
+        TypeError: If input data format is incorrect.
+    """
+
+    # Validate forecast data
+    if not weather_data or "forecast" not in weather_data:
+        raise ValueError("Missing weather forecast data.")
+
+    forecast = weather_data["forecast"]
+    if not isinstance(forecast, list) or len(forecast) == 0:
+        raise ValueError("Forecast data must be a non-empty list.")
+
+    # Extract dates and precipitation values
+    dates = []
+    precipitation = []
+    for entry in forecast:
+        try:
+            dates.append(entry["date"])
+            precipitation.append(float(entry.get("precipitation", 0)))
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("Forecast entries must contain valid 'date' and 'precipitation' values.")
+
+    # Create figure and plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.bar(dates, precipitation, color="skyblue", alpha=0.7, label="Precipitation (mm)")
+
+    # Improve readability
+    ax.set_title(f"Precipitation Forecast for {weather_data.get('location', 'Unknown Location')}", fontsize=16, weight='bold')
+    ax.set_xlabel("Date", fontsize=12)
+    ax.set_ylabel("Precipitation (mm)", fontsize=12)
+    ax.tick_params(axis='x', rotation=30)
+    ax.grid(alpha=0.3, axis='y')
+    ax.legend(title="Legend", fontsize=10)
+
+    plt.tight_layout()
+
+    # Display or return figure
+    if output_type == 'display':
+        plt.show()
+        return None
+    elif output_type == 'return':
+        return fig
+    else:
+        raise ValueError("Invalid output_type. Use 'display' or 'return'.")
+
+🔹 Example Usage
+Display Chart:
+create_precipitation_visualisation(weather_data, output_type='display')
+Return Figure for Saving:
+fig = create_precipitation_visualisation(weather_data, output_type='return')
+fig.savefig("precipitation_forecast.png")
+
+Me: Thanks a lot! However, I noticed that the precipitation graph is empty. Can you improve the function so it handles missing precipitation values?
+AI: Ah — I understand 😄.
+That usually means the data we are feeding into create_precipitation_visualisation() doesn’t actually have precipitation values — or the precipitation key is missing in your forecast entries.Let’s troubleshoot and fix this step-by-step.
+
+Why the Graph Is Empty
+Your function assumes:
+entry.get("precipitation", 0)
+But OpenWeatherMap’s processed weather data often doesn’t store "precipitation" unless you specifically extract it in your get_weather_data() function.
+Instead, precipitation values may be stored differently — for example:
+
+"rain": {"3h": 0.5} → rainfall in mm over the last 3 hours
+
+"snow": {"3h": 0.0} → snowfall in mm
+
+If your forecast data does not include "precipitation", the chart will show all zeros → resulting in an empty-looking graph.
+Fix: Extract Precipitation Data in Your Weather Function
+
+Before visualising, make sure your get_weather_data() function includes precipitation values.
+Example modification:
+def get_weather_data(...):
+    ...
+    forecast_list = []
+    for entry in forecast_data["list"]:
+        date = entry["dt_txt"].split(" ")[0]
+        precipitation = 0
+        if "rain" in entry and "3h" in entry["rain"]:
+            precipitation = entry["rain"]["3h"]
+        elif "snow" in entry and "3h" in entry["snow"]:
+            precipitation = entry["snow"]["3h"]
+
+        forecast_list.append({
+            "date": date,
+            "temperature_min": entry["main"]["temp_min"],
+            "temperature_max": entry["main"]["temp_max"],
+            "precipitation": precipitation
+        })
+    ...
+This ensures your processed weather data dictionary includes "precipitation" for each forecast day.
+Test Data for the Visualization
+
+For testing without modifying your weather fetching function yet, you can manually add precipitation data:
+weather_data = {
+    "location": "Perth, AU",
+    "forecast": [
+        {"date": "2025-10-11", "temperature_min": 19, "temperature_max": 29, "precipitation": 0},
+        {"date": "2025-10-12", "temperature_min": 18, "temperature_max": 27, "precipitation": 2},
+        {"date": "2025-10-13", "temperature_min": 20, "temperature_max": 30, "precipitation": 5},
+        {"date": "2025-10-14", "temperature_min": 17, "temperature_max": 28, "precipitation": 1},
+        {"date": "2025-10-15", "temperature_min": 16, "temperature_max": 26, "precipitation": 0}
+    ]
+}
+Then run:
+create_precipitation_visualisation(weather_data, output_type='display')
+You should now see bars for precipitation values.
+
+Why my prompting strategy was effective?
+1. I identified specific issues in the initial codes (etc. missing precipitation values)
+2. I requested specific improvements with clear objectives (etc. improve the readability of visualisations with proper titles, axis labels, and legends)
+3. I identified the input and output of the functions (input: weather data returned by get_weather_data() function and output: display the plot or figure)

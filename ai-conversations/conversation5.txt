@@ -1,0 +1,696 @@
+Tool: Deepseek
+Date: 16-10-2025
+Title: Conversations about code/concept explanations
+Note: Some parts of the code have been omitted due to the length. Only the most relevant sections are included to illustrate the specific areas for improvements.
+------------------------------------------------------------------------------------------------------------------
+Me： I received this code suggestion from another AI assistant regarding generating AI responses for weather-related questions. Can you review and:
+1. Explain the logic of the code line-by-line
+2. Identify any edge cases where it might fail
+3. Suggest minimal fixes that could improve the overall functionality
+4. Explain the difference between rule-based responses and AI response (strengths and weaknesses)
+
+def generate_ai_weather_response(parsed_question: Dict[str, Any], weather_data: Dict[str, Any], config: WeatherConfig) -> str:
+    """
+    Generate AI-powered weather response using hands-on-ai package.
+    Falls back to rule-based responses if AI fails.
+    """
+    # Check if AI is enabled and configured
+    if not config.use_ollama or not config.ollama_api_key:
+        return generate_weather_response(parsed_question, weather_data)
+
+    try:
+        # Prepare context for AI
+        context = prepare_ai_context(parsed_question, weather_data)
+
+        # Create prompt for AI
+        prompt = f"""
+        You are a helpful weather assistant. Based on the weather data below, provide a natural, conversational response.
+
+        WEATHER DATA:
+        {context}
+
+        USER QUESTION: {parsed_question.get('original_question', 'Unknown question')}
+
+        Please provide a friendly, accurate weather response using the specific numbers from the data.
+        Be conversational but professional. Include relevant details like temperature, conditions, and any notable weather features.
+
+        WEATHER RESPONSE:
+        """
+
+        print("🤖 Consulting AI weather expert...")
+
+        # Use hands-on-ai package
+        response = get_response(prompt)
+
+        # Validate response
+        if response and len(response.strip()) > 20:  # Reasonable length check
+            return response.strip()
+        else:
+            raise Exception("AI returned empty or too short response")
+
+    except Exception as e:
+        print(f"⚠️  AI response failed: {e}. Using rule-based response.")
+        return generate_weather_response(parsed_question, weather_data)
+
+def prepare_ai_context(parsed_question: Dict[str, Any], weather_data: Dict[str, Any]) -> str:
+    """Prepare comprehensive context for AI with all weather data."""
+    location = weather_data.get('location', 'Unknown location')
+    current = weather_data.get('current', {})
+    forecast = weather_data.get('forecast', [])
+
+    context_parts = []
+
+    # Current weather section
+    context_parts.append(f"📍 CURRENT WEATHER IN {location.upper()}:")
+    context_parts.append(f"• Temperature: {current.get('temperature', 'N/A')}°C")
+    context_parts.append(f"• Conditions: {current.get('description', 'N/A')}")
+    context_parts.append(f"• Humidity: {current.get('humidity', 'N/A')}%")
+    context_parts.append(f"• Wind Speed: {current.get('wind_speed', 'N/A')} km/h")
+
+    # Forecast section
+    if forecast:
+        context_parts.append(f"\n📅 FORECAST FOR NEXT {len(forecast)} DAYS:")
+        for i, day in enumerate(forecast):
+            day_label = "Today" if i == 0 else f"Day {i+1}"
+            context_parts.append(f"• {day_label} ({day.get('date', 'N/A')}):")
+            context_parts.append(f"  - Min: {day.get('temperature_min', 'N/A')}°C, Max: {day.get('temperature_max', 'N/A')}°C")
+            context_parts.append(f"  - Conditions: {day.get('description', 'N/A')}")
+            precip = day.get('precipitation', 0)
+            if precip > 0:
+                context_parts.append(f"  - Precipitation: {precip}mm")
+
+    # User query context
+    context_parts.append(f"\n🎯 USER IS ASKING ABOUT: {parsed_question.get('attribute', 'general weather')}")
+    context_parts.append(f"📅 TIME FRAME: {parsed_question.get('time_period', 'current')}")
+
+    return "\n".join(context_parts)
+
+AI: 1. Code Logic Line-by-Line
+generate_ai_weather_response function:
+
+Lines 6-7: Checks if AI is enabled and configured, falls back to rule-based if not
+
+Lines 10-11: Prepares weather context data for the AI prompt
+
+Lines 14-28: Creates a detailed prompt with weather data, user question, and response guidelines
+
+Line 31: Prints a user notification that AI is being used
+
+Line 34: Calls the AI service (get_response) with the prepared prompt
+
+Lines 37-40: Validates the AI response isn't empty or too short
+
+Lines 42-44: Falls back to rule-based response if AI fails
+
+prepare_ai_context function:
+
+Lines 50-53: Extracts location, current weather, and forecast data
+
+Lines 58-61: Formats current weather details (temp, conditions, humidity, wind)
+
+Lines 64-74: Adds multi-day forecast with precipitation highlights
+
+Lines 77-78: Includes user's specific query context
+
+Line 80: Returns formatted context string
+
+2. Edge Cases Where It Might Fail
+AI Service Issues:
+
+get_response() timeout or network failure
+
+Invalid API key despite config check
+
+AI service rate limiting or downtime
+
+Data Quality Issues: # Missing data could cause KeyErrors
+weather_data.get('current', {})  # Good - but nested gets could fail
+day.get('temperature_min', 'N/A')  # What if 'day' is None?
+
+Response Validation Issues:
+
+AI returns "I don't know" or refusal (still >20 chars)
+
+AI returns irrelevant content that passes length check
+
+Malformed JSON or code in response
+
+User Input Issues:
+
+parsed_question missing required keys
+
+Non-English questions that AI might mishandle
+
+Very specific questions beyond forecast data
+
+3. Minimal Fixes to Improve Functionality
+Fix 1: Better Error Handling & Validation
+# Add more robust validation
+def validate_ai_response(response: str) -> bool:
+    """Check if AI response is actually about weather."""
+    if not response or len(response.strip()) < 30:
+        return False
+    
+    # Basic content validation
+    weather_keywords = ['temperature', 'weather', 'forecast', 'rain', 'sunny', 'cloudy', 'wind']
+    response_lower = response.lower()
+    return any(keyword in response_lower for keyword in weather_keywords)
+
+# Usage in main function:
+if response and validate_ai_response(response):
+    return response.strip()
+Fix 2: Improved Data Safety
+# Safer data access in prepare_ai_context
+def safe_get(data, *keys, default='N/A'):
+    """Safely get nested dictionary values."""
+    current = data
+    for key in keys:
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            return default
+    return current
+
+# Usage example:
+temperature = safe_get(weather_data, 'current', 'temperature', default='N/A')
+Fix 3: Request Timeout
+# Add timeout to AI call (implementation depends on get_response)
+try:
+    response = get_response(prompt, timeout=30)  # 30 second timeout
+except TimeoutError:
+    print("AI request timed out")
+    return generate_weather_response(parsed_question, weather_data)
+4. Rule-Based vs AI Responses: Strengths & Weaknesses
+Rule-Based Responses:
+Strengths:
+
+✅ Reliable: Always works with available data
+
+✅ Consistent: Same input = same output
+
+✅ Fast: No external API calls
+
+✅ Controllable: Exact formatting and content
+
+✅ Predictable: No unexpected responses
+
+Weaknesses:
+
+❌ Inflexible: Can't handle unanticipated questions
+
+❌ Limited: Only covers pre-programmed scenarios
+
+❌ Robotic: Lacks natural conversation flow
+
+❌ Maintenance: Need to add rules for new question types
+AI Responses:
+Strengths:
+
+✅ Flexible: Handles diverse, unexpected questions
+
+✅ Natural: Conversational, human-like responses
+
+✅ Context-aware: Can infer intent and provide relevant details
+
+✅ Adaptable: Learns patterns without explicit programming
+
+Weaknesses:
+
+❌ Unreliable: May hallucinate or provide incorrect data
+
+❌ Inconsistent: Same input can yield different outputs
+
+❌ Slow: API latency and processing time
+
+❌ Unpredictable: May return inappropriate or off-topic content
+
+❌ Cost: API usage expenses and rate limits
+
+Hybrid Approach (as shown in code):
+The current implementation represents a good balance - using AI for natural language generation while having rule-based fallback for reliability. This gives you the best of both worlds: engaging conversations when possible, but guaranteed functionality when needed.
+
+Me: Regarding the user interface, I tested the console method by asking "What is the temperature today?" and then chose to view the weather chart. The system correctly displayed "No forecast data available for visualisation," but it still printed "Charts shown. ready for your next question."
+
+Can you review the logic flow behind the issue, and improve the function feedback so that the program will only display "Charts shown" when the chart is actually generated.
+
+AI: Looking at this issue, the problem is clear: the system is showing "Charts shown" regardless of whether charts were actually generated. Let me analyze the logic flow and provide a fix.
+Logic Flow Analysis
+Based on the behavior you described, here's what's happening:
+
+User asks: "What is the temperature today?" → System provides text response
+
+User requests chart → System attempts to generate chart
+
+No forecast data available → Chart generation fails
+
+BUT system still prints "Charts shown" → This is the bug
+
+The issue is likely in a function that always returns success or always prints the success message without checking if chart generation actually occurred.
+
+🔧 Fix: Update the Visualization Logic in chat_mode()
+Find this section in your chat_mode() method:
+# Ask if user wants visualizations only if we have valid weather data
+if (self.last_weather_data and self.last_weather_data.get('forecast') and 
+    'location' in question.lower() or any(word in question.lower() for word in ['weather', 'temperature', 'rain', 'forecast'])):
+    show_viz = pyip.inputYesNo(
+        "\n📊 Would you like to see weather charts? (yes/no): ",
+        default='no'
+    )
+    if show_viz == 'yes':
+        self.show_visualizations()
+        print("\n📈 Charts shown. Ready for your next question!\n")
+Replace it with this fixed version:
+# Ask if user wants visualizations only if we have valid forecast data
+if (self.last_weather_data and self.last_weather_data.get('forecast') and 
+    ('location' in question.lower() or any(word in question.lower() for word in ['weather', 'temperature', 'rain', 'forecast']))):
+    
+    show_viz = pyip.inputYesNo(
+        "\n📊 Would you like to see weather charts? (yes/no): ",
+        default='no'
+    )
+    if show_viz == 'yes':
+        # Store the current state to check if charts were actually shown
+        charts_were_shown = self.show_visualizations()
+        
+        # Only show success message if charts were actually displayed
+        if charts_were_shown:
+            print("\n📈 Charts shown. Ready for your next question!\n")
+        else:
+            print("\n📊 No charts available. Ready for your next question!\n")
+🔧 Fix 2: Update show_visualizations() to Return Status
+Update your show_visualizations() method to return whether charts were actually shown:
+def show_visualizations(self) -> bool:
+    """
+    Display weather visualizations.
+    Returns: True if charts were shown, False otherwise
+    """
+    if not self.last_weather_data or not self.last_weather_data.get('forecast'):
+        print("\n⚠️  No forecast data available for visualization.")
+        print("Please fetch a 5-day forecast first.\n")
+        return False  # No charts were shown
+
+    print("\n📈 WEATHER VISUALIZATIONS")
+    print("─" * 40)
+
+    viz_choice = pyip.inputMenu(
+        ['Temperature trend', 'Precipitation forecast', 'Both'],
+        prompt="\nSelect visualization:\n",
+        numbered=True
+    )
+
+    print(f"\n📊 Generating {viz_choice.lower()}...\n")
+
+    try:
+        charts_shown = False
+        
+        if viz_choice in ['Temperature trend', 'Both']:
+            create_temperature_visualisation(self.last_weather_data, output_type='display')
+            charts_shown = True
+            
+        if viz_choice in ['Precipitation forecast', 'Both']:
+            create_precipitation_visualisation(self.last_weather_data, output_type='display')
+            charts_shown = True
+
+        return charts_shown  # Return whether charts were actually displayed
+
+    except Exception as e:
+        print(f"❌ Error creating visualization: {e}\n")
+        return False  # No charts were shown due to error
+🔧 Alternative Simpler Fix
+If you prefer a simpler approach without changing the return type, just update the logic in chat_mode():
+# Ask if user wants visualizations only if we have valid forecast data
+if (self.last_weather_data and self.last_weather_data.get('forecast') and 
+    ('location' in question.lower() or any(word in question.lower() for word in ['weather', 'temperature', 'rain', 'forecast']))):
+    
+    show_viz = pyip.inputYesNo(
+        "\n📊 Would you like to see weather charts? (yes/no): ",
+        default='no'
+    )
+    if show_viz == 'yes':
+        # Check if we actually have forecast data before trying to show charts
+        if self.last_weather_data and self.last_weather_data.get('forecast'):
+            self.show_visualizations()
+            print("\n📈 Charts shown. Ready for your next question!\n")
+        else:
+            print("\n📊 No forecast data available for charts.\n")
+
+🎯 Recommended Solution:
+I recommend implementing Fix 1 + Fix 2 together:
+
+Always fetch forecast data so charts are available
+
+Return status from show_visualizations() to know if charts were shown
+
+Only show success message when charts were actually displayed
+
+This will fix both the logic issue and ensure charts are actually available when users want them!
+
+Me: Awesome. Can you explain how Python manage variables when different functions, such as get_weather_data() and generate_weather_response() need to use or share the same data?
+AI: Great question! Python manages variable sharing between functions through several mechanisms. Let me explain how data flows between functions like get_weather_data() and generate_weather_response().
+1. Parameter Passing (Most Common)
+The most straightforward way - passing data as function arguments:
+def get_weather_data(location: str) -> Dict[str, Any]:
+    """Fetches weather data from API"""
+    weather_data = {
+        'location': location,
+        'current': {'temperature': 22, 'humidity': 65},
+        'forecast': [...]
+    }
+    return weather_data
+
+def generate_weather_response(parsed_question: Dict, weather_data: Dict) -> str:
+    """Uses the weather data to generate response"""
+    temp = weather_data['current']['temperature']
+    return f"Temperature is {temp}°C"
+
+# Main flow - passing data between functions
+def main():
+    # Get data from one function
+    weather_data = get_weather_data("London")
+    
+    # Pass it to another function
+    question = {"attribute": "temperature"}
+    response = generate_weather_response(question, weather_data)
+    
+    print(response)
+Key Points:
+
+Each function gets its own copy of the reference to the dictionary
+
+Modifications to mutable objects (like dicts, lists) affect the original data
+
+Clean, explicit data flow
+2. Global Variables (Use Sparingly)
+# Global variable - generally avoided in good design
+current_weather_data = None
+
+def get_weather_data(location: str):
+    global current_weather_data
+    current_weather_data = fetch_from_api(location)
+
+def generate_weather_response(parsed_question: Dict) -> str:
+    global current_weather_data  # Access global data
+    if current_weather_data:
+        return f"Temp: {current_weather_data['current']['temperature']}°C"
+    return "No data available"
+Problems with this approach:
+
+❌ Hard to track data modifications
+
+❌ Testing becomes difficult
+
+❌ Can lead to subtle bugs
+
+❌ Not thread-safe
+
+3. Class-Based Approach (Recommended for Complex Apps)
+class WeatherAssistant:
+    def __init__(self):
+        self.weather_data = None  # Instance variable
+        
+    def get_weather_data(self, location: str) -> None:
+        """Store data in instance variable"""
+        self.weather_data = {
+            'location': location,
+            'current': {'temperature': 22, 'humidity': 65},
+            'forecast': [...]
+        }
+    
+    def generate_weather_response(self, parsed_question: Dict) -> str:
+        """Use the stored instance data"""
+        if not self.weather_data:
+            return "Please fetch weather data first"
+            
+        temp = self.weather_data['current']['temperature']
+        return f"Temperature is {temp}°C"
+    
+    def clear_data(self):
+        self.weather_data = None
+
+# Usage
+assistant = WeatherAssistant()
+assistant.get_weather_data("London")
+response = assistant.generate_weather_response({"attribute": "temperature"})
+
+Me: Another AI assistant suggested that I should use a class-based approach for my weather chatbot (for example, using a WeatherConfig class to manage settings). Can you explain why using a class would be better than using dictionaries for managing this kind of data?
+
+class WeatherConfig:
+    """Configuration settings for the weather chatbot."""
+
+    def __init__(self):
+        self.default_location = "Perth"
+        self.default_units = "metric"
+        self.default_forecast_days = 5
+
+        # Ollama settings
+        self.ollama_model = os.getenv('HANDS_ON_AI_MODEL', 'granite3.2')
+        self.ollama_host = os.getenv('HANDS_ON_AI_SERVER', 'https://ollama.serveur.au')
+        self.ollama_api_key = os.getenv('HANDS_ON_AI_API_KEY')
+
+        # Enable AI if API key is available
+        self.use_ollama = bool(self.ollama_api_key)
+
+        self.validate_ai_setup()
+AI: Excellent question! The class-based approach is indeed superior to dictionaries for configuration management. Let me explain the key advantages with concrete examples.
+1. Type Safety & Validation
+Dictionary Approach:
+config = {
+    "default_location": "Perth",
+    "default_units": "metric", 
+    "use_ollama": "true"  # Oops, string instead of boolean!
+}
+
+# This fails silently or causes weird bugs
+if config["use_ollama"]:  # Always True because non-empty string!
+    # AI tries to run but fails later with obscure error
+Class Approach:
+class WeatherConfig:
+    def __init__(self):
+        self.default_location = "Perth"
+        self.default_units = "metric"
+        self.use_ollama = bool(self.ollama_api_key)  # Proper boolean
+        
+    def validate_ai_setup(self):
+        if self.use_ollama and not self.ollama_api_key:
+            raise ValueError("AI enabled but no API key provided")
+2. Intelligent Defaults & Computation
+Dictionary Approach:
+config = {
+    "ollama_model": os.getenv('HANDS_ON_AI_MODEL', 'granite3.2'),
+    "use_ollama": bool(os.getenv('HANDS_ON_AI_API_KEY'))  # Can't do this cleanly!
+}
+
+# You'd need separate logic outside the dict
+config["use_ollama"] = bool(config.get("ollama_api_key"))
+Class Approach:
+class WeatherConfig:
+    def __init__(self):
+        self.ollama_model = os.getenv('HANDS_ON_AI_MODEL', 'granite3.2')
+        self.ollama_api_key = os.getenv('HANDS_ON_AI_API_KEY')
+        self.use_ollama = bool(self.ollama_api_key)  # Computed property!
+        
+        # Complex logic is cleanly encapsulated
+        self.validate_ai_setup()
+3. Method Encapsulation
+Dictionary Approach:
+# Validation logic scattered elsewhere
+def validate_config(config_dict):
+    if config_dict.get("use_ollama") and not config_dict.get("ollama_api_key"):
+        print("Warning: AI enabled but no API key!")
+
+# Usage
+config = {...}
+validate_config(config)  # External function call
+Class Approach:
+class WeatherConfig:
+    def __init__(self):
+        # ... initialization ...
+        self.validate_ai_setup()  # Self-contained validation
+        
+    def validate_ai_setup(self):
+        """Encapsulated validation logic"""
+        if self.use_ollama and not self.ollama_api_key:
+            raise ValueError("AI enabled but no API key provided")
+        if self.use_ollama:
+            print(f"✅ AI configured with model: {self.ollama_model}")
+
+When to Use Dictionaries vs Classes
+Use dictionaries when:
+
+Simple configuration with few values
+
+Temporary configuration that changes frequently
+
+Interoperability with JSON/YAML files is crucial
+
+Use classes when:
+
+Complex configuration with validation logic
+
+Configuration needs computed properties
+
+You want type safety and IDE support
+
+Configuration is shared across multiple modules
+
+You need inheritance or specialization
+
+For your weather chatbot, the class approach is definitely the right choice. It provides the structure, safety, and maintainability you need as your application grows in complexity.
+
+Me: I also identified an error in the console interface. The interface request me to "press enter to continue". However, a 'blank values are not allowed' message appears afterwards. How can I fix this issue to ensure the program runs smoothly? 
+
+AI: The issue is that in chat_mode(), the main input is using pyip.inputStr() which doesn't allow blank values, but we need a way for users to continue after visualizations without triggering the "blank values" error.
+🔧 Fix: Use a Special Command for Continuing
+Update your chat_mode() method:
+def chat_mode(self):
+    """Interactive chat mode for natural language queries."""
+    print("\n" + "=" * 80)
+    print("💬 CHAT MODE")
+    print("=" * 80)
+    print("Ask me about the weather! Type 'back' to return to main menu.")
+    print("Type 'continue' or just press Enter after charts to keep chatting.")
+    print("\n📝 Examples:")
+    print("   • Will it rain tomorrow in Perth?")
+    print("   • How hot will it be in Sydney today?")
+    print("   • What's the weather forecast for London?")
+    print("=" * 80 + "\n")
+
+    while True:
+        try:
+            # Get user question
+            question = pyip.inputStr(
+                "You: ",
+                blank=False,  # This prevents blank inputs
+                strip=True
+            )
+
+            # Check for exit
+            if question.lower() in ['back', 'exit', 'quit', 'return']:
+                print("\n↩️  Returning to main menu...\n")
+                break
+
+            # Check for commands
+            if question.lower() == 'help':
+                self.show_help()
+                continue
+
+            if question.lower() in ['chart', 'graph', 'visualize']:
+                if self.last_weather_data:
+                    self.show_visualizations()
+                else:
+                    print("Bot: Please ask a weather question first!\n")
+                continue
+
+            # Process weather question
+            print("\nBot: 🔍 Let me check that for you...\n")
+            self.process_weather_query(question)
+
+            # Ask if user wants visualizations
+            if self.last_weather_data and self.last_weather_data.get('forecast'):
+                show_viz = pyip.inputYesNo(
+                    "\n📊 Would you like to see weather charts? (yes/no): ",
+                    default='no'
+                )
+                if show_viz == 'yes':
+                    self.show_visualizations()
+                    # After charts, use a special input that allows blank/continue
+                    print("\n💡 Type 'continue' or ask another question...")
+                    # Don't break the loop - just continue to next iteration
+
+            # Add to history
+            self.session_history.append({
+                'timestamp': datetime.now().strftime("%H:%M:%S"),
+                'question': question,
+                'location': self.last_location
+            })
+
+            print()  # Add spacing
+
+        except KeyboardInterrupt:
+            print("\n\n↩️  Returning to main menu...\n")
+            break
+        except Exception as e:
+            print(f"\n❌ Error: {e}\n")
+🔧 Alternative Fix: Use Try-Except for Blank Inputs
+If you prefer to allow Enter key to continue:
+def chat_mode(self):
+    """Interactive chat mode for natural language queries."""
+    print("\n" + "=" * 80)
+    print("💬 CHAT MODE")
+    print("=" * 80)
+    print("Ask me about the weather! Type 'back' to return to main menu.")
+    print("Press Enter twice to continue after charts.")
+    print("=" * 80 + "\n")
+
+    while True:
+        try:
+            # Get user question
+            question = pyip.inputStr(
+                "You: ",
+                blank=False,
+                strip=True
+            )
+
+            # Check for exit and commands (same as above)
+            if question.lower() in ['back', 'exit', 'quit', 'return']:
+                print("\n↩️  Returning to main menu...\n")
+                break
+
+            if question.lower() == 'help':
+                self.show_help()
+                continue
+
+            if question.lower() in ['chart', 'graph', 'visualize']:
+                if self.last_weather_data:
+                    self.show_visualizations()
+                else:
+                    print("Bot: Please ask a weather question first!\n")
+                continue
+
+            # Process weather question
+            print("\nBot: 🔍 Let me check that for you...\n")
+            self.process_weather_query(question)
+
+            # Ask if user wants visualizations
+            if self.last_weather_data and self.last_weather_data.get('forecast'):
+                show_viz = pyip.inputYesNo(
+                    "\n📊 Would you like to see weather charts? (yes/no): ",
+                    default='no'
+                )
+                if show_viz == 'yes':
+                    self.show_visualizations()
+                    # After charts, provide clear instructions
+                    print("\n📝 Ready for your next question...")
+                    # The loop will naturally continue to the next "You: " prompt
+
+            # Add to history
+            self.session_history.append({
+                'timestamp': datetime.now().strftime("%H:%M:%S"),
+                'question': question,
+                'location': self.last_location
+            })
+
+            print()  # Add spacing
+
+        except KeyboardInterrupt:
+            print("\n\n↩️  Returning to main menu...\n")
+            break
+        except Exception as e:
+            print(f"\n❌ Error: {e}\n")
+🎯 The Key Insight:
+The issue is that after showing charts, the loop immediately goes back to pyip.inputStr() which requires non-blank input.
+
+The solution is: After charts, we don't need an extra "Press Enter" - we can just let the loop continue naturally to the next "You: " prompt. The user will see they're back at the input prompt and can type their next question.
+
+🚀 Recommended Approach:
+Use the first solution - it's cleaner and more intuitive:
+
+User sees charts
+
+System shows "Type 'continue' or ask another question..."
+
+Loop continues to next "You: " prompt
+
+User types their next question or 'continue'
+
+No more "blank values" error!
